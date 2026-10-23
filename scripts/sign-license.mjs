@@ -20,7 +20,7 @@ async function signLicense(type) {
     validUntil: type === 'lifetime' ? undefined : new Date(Date.now() + parseInt(type) * 24 * 60 * 60 * 1000).toISOString()
   };
   
-  const payloadB64 = btoa(JSON.stringify(payload));
+  const payloadB64 = base64urlEncode(JSON.stringify(payload));
   const payloadBytes = new TextEncoder().encode(payloadB64);
   
   const privateKeyBytes = hexToBytes(PRIVATE_KEY_HEX);
@@ -35,7 +35,7 @@ async function signLicense(type) {
   );
   
   const signature = await subtle.sign('Ed25519', privateKey, payloadBytes);
-  const signatureB64 = btoa(bytesToHex(new Uint8Array(signature)));
+  const signatureB64 = base64urlEncode(new Uint8Array(signature));
   
   const licenseKey = `${payloadB64}.${signatureB64}`;
   
@@ -57,8 +57,12 @@ function bytesToHex(bytes) {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function btoa(str) {
-  return Buffer.from(str).toString('base64');
+function base64urlEncode(data) {
+  const bytes = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
+  return bytes.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
 }
 
 signLicense(licenseType).catch(console.error);

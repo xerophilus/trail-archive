@@ -43,7 +43,7 @@ on trail",Run,7.27,3600,7270.5,3600.0,3540,125.0,Nike Pegasus 40,activities/1234
     expect(activities[0].name).toContain('Morning Run');
   });
   
-  it('locks activities older than 12 months', () => {
+  it('parses old activities without setting locked flag', () => {
     const oldDate = new Date();
     oldDate.setMonth(oldDate.getMonth() - 13);
     const dateStr = oldDate.toLocaleString('en-US', { 
@@ -62,6 +62,7 @@ on trail",Run,7.27,3600,7270.5,3600.0,3540,125.0,Nike Pegasus 40,activities/1234
     const activities = parseStravaCSV(csv);
     
     expect(activities).toHaveLength(1);
-    expect(activities[0].locked).toBe(true);
+    expect(activities[0].locked).toBe(false);
+    expect(activities[0].startTime).toBeInstanceOf(Date);
   });
 });

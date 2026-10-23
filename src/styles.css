@@ -441,7 +441,7 @@ tr:hover td {
 }
 
 .locked-overlay::after {
-  content: '🔒 Unlock lifetime to access';
+  content: 'Unlock lifetime to access';
   position: absolute;
   top: 50%;
   left: 50%;

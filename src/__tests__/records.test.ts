@@ -27,7 +27,7 @@ describe('Records Computation', () => {
       }
     ];
     
-    const records = computeRecords(activities);
+    const records = computeRecords(activities, true);
     const longestRun = records.find(r => r.name === 'Longest Run');
     
     expect(longestRun).toBeDefined();
@@ -59,7 +59,7 @@ describe('Records Computation', () => {
       }
     ];
     
-    const records = computeRecords(activities);
+    const records = computeRecords(activities, true);
     const biggestClimb = records.find(r => r.name === 'Biggest Climb');
     
     expect(biggestClimb).toBeDefined();
@@ -80,14 +80,14 @@ describe('Records Computation', () => {
       }
     ];
     
-    const records = computeRecords(activities);
+    const records = computeRecords(activities, true);
     const fiveK = records.find(r => r.name === '5K');
     
     expect(fiveK).toBeDefined();
     expect(fiveK!.value).toBe(1200);
   });
   
-  it('excludes locked activities', () => {
+  it('excludes locked activities when license invalid', () => {
     const activities: Activity[] = [
       {
         id: '1',
@@ -97,11 +97,11 @@ describe('Records Computation', () => {
         distance: 50,
         duration: 18000,
         elevationGain: 2000,
-        locked: true
+        locked: false
       }
     ];
     
-    const records = computeRecords(activities);
+    const records = computeRecords(activities, false);
     const longestRun = records.find(r => r.name === 'Longest Run');
     
     expect(longestRun).toBeUndefined();
@@ -143,13 +143,13 @@ describe('Yearly Stats', () => {
       }
     ];
     
-    const yearlyStats = computeYearlyStats(activities);
+    const yearlyStats = computeYearlyStats(activities, true);
     
     expect(yearlyStats.get(2025)).toEqual({ distance: 25, count: 2 });
     expect(yearlyStats.get(2026)).toEqual({ distance: 20, count: 1 });
   });
   
-  it('excludes locked activities from stats', () => {
+  it('excludes locked activities from stats when license invalid', () => {
     const activities: Activity[] = [
       {
         id: '1',
@@ -159,11 +159,11 @@ describe('Yearly Stats', () => {
         distance: 100,
         duration: 36000,
         elevationGain: 1000,
-        locked: true
+        locked: false
       }
     ];
     
-    const yearlyStats = computeYearlyStats(activities);
+    const yearlyStats = computeYearlyStats(activities, false);
     
     expect(yearlyStats.get(2020)).toBeUndefined();
   });

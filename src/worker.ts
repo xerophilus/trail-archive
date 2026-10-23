@@ -106,7 +106,11 @@ async function handleZipImport(zipFile: File): Promise<void> {
       const text = new TextDecoder().decode(dataToProcess);
       parsedActivity = parseTCX(text, activityId);
     } else if (filename.includes('.fit')) {
-      parsedActivity = parseFIT(dataToProcess.buffer, activityId);
+      const fitBuffer = dataToProcess.buffer.slice(
+        dataToProcess.byteOffset,
+        dataToProcess.byteOffset + dataToProcess.byteLength
+      );
+      parsedActivity = await parseFIT(fitBuffer, activityId);
     }
     
     if (parsedActivity && activityId) {
@@ -171,7 +175,8 @@ async function handleFileImport(files: File[]): Promise<void> {
       const text = new TextDecoder().decode(data);
       activity = parseTCX(text);
     } else if (file.name.includes('.fit')) {
-      activity = parseFIT(data.buffer);
+      const fitBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      activity = await parseFIT(fitBuffer);
     }
     
     if (activity) {

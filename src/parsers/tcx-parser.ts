@@ -1,65 +1,78 @@
+import { XMLParser } from 'fast-xml-parser';
 import type { Activity, RoutePoint } from '../types';
 
 export function parseTCX(xmlText: string, activityId?: string): Activity | null {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlText, 'text/xml');
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    parseAttributeValue: true
+  });
   
-  if (doc.querySelector('parsererror')) return null;
-  
-  const activityElement = doc.querySelector('Activity');
-  if (!activityElement) return null;
-  
-  const type = activityElement.getAttribute('Sport') || 'Run';
-  const lap = activityElement.querySelector('Lap');
-  if (!lap) return null;
-  
-  const startTimeStr = lap.getAttribute('StartTime');
-  const startTime = startTimeStr ? new Date(startTimeStr) : new Date();
-  
-  const totalTimeSeconds = parseFloat(lap.querySelector('TotalTimeSeconds')?.textContent || '0');
-  const distanceMeters = parseFloat(lap.querySelector('DistanceMeters')?.textContent || '0');
-  
-  const trackpoints = Array.from(lap.querySelectorAll('Trackpoint'));
-  const route: RoutePoint[] = [];
-  let totalElevationGain = 0;
-  let lastEle: number | null = null;
-  
-  for (const tp of trackpoints) {
-    const position = tp.querySelector('Position');
-    if (!position) continue;
+  try {
+    const doc = parser.parse(xmlText);
     
-    const lat = parseFloat(position.querySelector('LatitudeDegrees')?.textContent || '0');
-    const lon = parseFloat(position.querySelector('LongitudeDegrees')?.textContent || '0');
-    const ele = parseFloat(tp.querySelector('AltitudeMeters')?.textContent || '0');
-    const timeStr = tp.querySelector('Time')?.textContent;
-    const time = timeStr ? new Date(timeStr) : undefined;
+    if (!doc.TrainingCenterDatabase) return null;
     
-    route.push({ lat, lon, ele, time });
+    const activities = doc.TrainingCenterDatabase.Activities;
+    if (!activities || !activities.Activity) return null;
     
-    if (lastEle !== null && ele > lastEle) {
-      totalElevationGain += (ele - lastEle);
+    const activityElement = activities.Activity;
+    const type = activityElement['@_Sport'] || 'Run';
+    
+    const lap = activityElement.Lap;
+    if (!lap) return null;
+    
+    const startTimeStr = lap['@_StartTime'];
+    const startTime = startTimeStr ? new Date(startTimeStr) : new Date();
+    
+    const totalTimeSeconds = parseFloat(lap.TotalTimeSeconds || '0');
+    const distanceMeters = parseFloat(lap.DistanceMeters || '0');
+    
+    const route: RoutePoint[] = [];
+    let totalElevationGain = 0;
+    let lastEle: number | null = null;
+    
+    if (lap.Track && lap.Track.Trackpoint) {
+      const trackpoints = Array.isArray(lap.Track.Trackpoint) 
+        ? lap.Track.Trackpoint 
+        : [lap.Track.Trackpoint];
+      
+      for (const tp of trackpoints) {
+        if (!tp.Position) continue;
+        
+        const lat = parseFloat(tp.Position.LatitudeDegrees || '0');
+        const lon = parseFloat(tp.Position.LongitudeDegrees || '0');
+        const ele = parseFloat(tp.AltitudeMeters || '0');
+        const timeStr = tp.Time;
+        const time = timeStr ? new Date(timeStr) : undefined;
+        
+        route.push({ lat, lon, ele, time });
+        
+        if (lastEle !== null && ele > lastEle) {
+          totalElevationGain += (ele - lastEle);
+        }
+        lastEle = ele;
+      }
     }
-    lastEle = ele;
+    
+    const name = activityElement.Notes || 'Untitled Activity';
+    
+    const id = activityId || `tcx-${startTime.getTime()}`;
+    
+    return {
+      id,
+      name,
+      type,
+      startTime,
+      distance: distanceMeters / 1000,
+      duration: totalTimeSeconds,
+      elevationGain: totalElevationGain,
+      averagePace: totalTimeSeconds > 0 && distanceMeters > 0 ? totalTimeSeconds / (distanceMeters / 1000) : undefined,
+      route: route.length > 0 ? route : undefined,
+      locked: false
+    };
+  } catch (error) {
+    console.error('TCX parse error:', error);
+    return null;
   }
-  
-  const name = activityElement.querySelector('Notes')?.textContent?.trim() || 'Untitled Activity';
-  
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const locked = startTime < twelveMonthsAgo;
-  
-  const id = activityId || `tcx-${startTime.getTime()}`;
-  
-  return {
-    id,
-    name,
-    type,
-    startTime,
-    distance: distanceMeters / 1000,
-    duration: totalTimeSeconds,
-    elevationGain: totalElevationGain,
-    averagePace: totalTimeSeconds > 0 && distanceMeters > 0 ? totalTimeSeconds / (distanceMeters / 1000) : undefined,
-    route: route.length > 0 ? route : undefined,
-    locked
-  };
 }

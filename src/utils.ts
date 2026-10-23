@@ -1,4 +1,12 @@
-import type { Units } from './types';
+import type { Units, Activity } from './types';
+
+export function isActivityLocked(activity: Activity, hasLicense: boolean): boolean {
+  if (hasLicense) return false;
+  
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  return activity.startTime < twelveMonthsAgo;
+}
 
 export function formatDistance(km: number, units: Units): string {
   if (units === 'mi') {
@@ -82,4 +90,17 @@ export function downloadBlob(blob: Blob, filename: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+export function escapeCsvField(field: string): string {
+  if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+    return `"${field.replace(/"/g, '""')}"`;
+  }
+  return field;
 }

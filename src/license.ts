@@ -18,7 +18,7 @@ export async function verifyLicense(licenseKey: string): Promise<LicenseStatus> 
     }
     
     const [payloadB64, signatureB64] = parts;
-    const payload = JSON.parse(atob(payloadB64));
+    const payload = JSON.parse(base64urlDecode(payloadB64));
     
     if (!payload.type || !payload.issued) {
       return { isValid: false, isLifetime: false, error: 'Invalid license payload' };
@@ -32,11 +32,10 @@ export async function verifyLicense(licenseKey: string): Promise<LicenseStatus> 
     }
     
     if (PUBLIC_KEY_SPKI_HEX === 'PLACEHOLDER_PUBLIC_KEY_SPKI_HEX_REPLACE_WITH_REAL_KEY') {
-      console.warn('Using placeholder public key - license verification disabled');
-      return { isValid: true, isLifetime, validUntil };
+      return { isValid: false, isLifetime: false, error: 'Public key not configured' };
     }
     
-    const signatureBytes = hexToBytes(atob(signatureB64));
+    const signatureBytes = base64urlDecodeToBytes(signatureB64);
     const payloadBytes = new TextEncoder().encode(payloadB64);
     
     const publicKeyBytes = hexToBytes(PUBLIC_KEY_SPKI_HEX);
@@ -108,6 +107,23 @@ function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes;
+}
+
+function base64urlDecode(str: string): string {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
+  return atob(base64 + pad);
+}
+
+function base64urlDecodeToBytes(str: string): Uint8Array {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
+  const binary = atob(base64 + pad);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
 }

@@ -4,7 +4,7 @@ import L from 'leaflet';
 import { getAllActivities, saveActivities, dedupeActivities, getGearMileage } from './db';
 import { checkLicenseStatus, saveLicense, verifyLicense } from './license';
 import { computeRecords, computeYearlyStats } from './records';
-import { formatDistance, formatPace, formatDuration, formatElevation, formatDate, getUnitsLabel, downloadBlob } from './utils';
+import { formatDistance, formatPace, formatDuration, formatElevation, formatDate, getUnitsLabel, downloadBlob, isActivityLocked, escapeHtml, escapeCsvField } from './utils';
 import type { Activity, Units, FilterState, ImportProgress } from './types';
 
 let currentUnits: Units = 'mi';
@@ -325,20 +325,23 @@ function renderActivitiesTable() {
   `;
   
   for (const activity of sorted) {
-    const locked = activity.locked && !licenseValid;
+    const locked = isActivityLocked(activity, licenseValid);
     const rowClass = locked ? 'locked-row' : '';
     const onclick = locked ? '' : `onclick="window.viewActivity('${activity.id}')"`;
+    
+    const escapedName = escapeHtml(activity.name);
+    const escapedGear = activity.gear ? escapeHtml(activity.gear) : '--';
     
     html += `
       <tr class="${rowClass}" ${onclick} style="${locked ? '' : 'cursor: pointer;'}">
         <td class="mono">${formatDate(activity.startTime)}</td>
-        <td>${activity.name}</td>
+        <td>${escapedName}</td>
         <td>${activity.type}</td>
         <td class="mono">${formatDistance(activity.distance, currentUnits)}</td>
         <td class="mono">${formatDuration(activity.duration)}</td>
         <td class="mono">${formatPace(activity.averagePace, currentUnits)}</td>
         <td class="mono">${formatElevation(activity.elevationGain, currentUnits)}</td>
-        <td>${activity.gear || '--'}</td>
+        <td>${escapedGear}</td>
       </tr>
     `;
   }
@@ -361,7 +364,7 @@ function renderActivityDetail(activity: Activity) {
   const labels = getUnitsLabel(currentUnits);
   
   let html = `
-    <h3>${activity.name}</h3>
+    <h3>${escapeHtml(activity.name)}</h3>
     <p>${formatDate(activity.startTime)} • ${activity.type}</p>
     
     <div class="activity-stats">
@@ -429,7 +432,7 @@ function renderHeatmap() {
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
   
-  const allRoutes = allActivities.filter(a => a.route && a.route.length > 0 && (!a.locked || licenseValid));
+  const allRoutes = allActivities.filter(a => a.route && a.route.length > 0 && !isActivityLocked(a, licenseValid));
   
   if (allRoutes.length === 0) {
     mapEl.innerHTML = '<p style="padding: 2rem; text-align: center;">No route data available</p>';
@@ -454,7 +457,7 @@ function renderRecords() {
   const container = document.getElementById('records-content');
   if (!container) return;
   
-  const records = computeRecords(allActivities);
+  const records = computeRecords(allActivities, licenseValid);
   
   if (!licenseValid && records.length === 0) {
     container.innerHTML = '<p>Unlock lifetime to see records from all time.</p>';
@@ -492,10 +495,10 @@ async function renderGear() {
   
   for (const item of gear) {
     const distance = parseFloat(formatDistance(item.totalDistance, currentUnits));
-    const status = distance >= threshold ? '⚠️ Retire' : '✓ OK';
+    const status = distance >= threshold ? 'Retire' : 'OK';
     const rowClass = distance >= threshold ? 'style="color: var(--color-danger);"' : '';
     
-    html += `<tr ${rowClass}><td>${item.name}</td><td class="mono">${formatDistance(item.totalDistance, currentUnits)} ${labels.distance}</td><td class="mono">${item.activityCount}</td><td>${status}</td></tr>`;
+    html += `<tr ${rowClass}><td>${escapeHtml(item.name)}</td><td class="mono">${formatDistance(item.totalDistance, currentUnits)} ${labels.distance}</td><td class="mono">${item.activityCount}</td><td>${status}</td></tr>`;
   }
   
   html += '</tbody></table>';
@@ -506,7 +509,7 @@ function renderCharts() {
   const container = document.getElementById('charts-content');
   if (!container) return;
   
-  const yearlyStats = computeYearlyStats(allActivities);
+  const yearlyStats = computeYearlyStats(allActivities, licenseValid);
   const labels = getUnitsLabel(currentUnits);
   
   let html = '<h3>Yearly Mileage</h3><table><thead><tr><th>Year</th><th>Distance</th><th>Activities</th></tr></thead><tbody>';
@@ -527,9 +530,9 @@ function updateLicenseDisplay() {
   
   if (licenseValid) {
     container.className = 'license-status unlocked';
-    container.innerHTML = '<p>✓ Lifetime license active</p>';
+    container.innerHTML = '<p>Lifetime license active</p>';
   } else {
-    const lockedCount = allActivities.filter(a => a.locked).length;
+    const lockedCount = allActivities.filter(a => isActivityLocked(a, false)).length;
     if (lockedCount > 0) {
       container.className = 'license-status locked';
       container.innerHTML = `
@@ -550,7 +553,6 @@ function updateLicenseDisplay() {
   if (status.isValid && status.isLifetime) {
     saveLicense(key);
     licenseValid = true;
-    allActivities.forEach(a => a.locked = false);
     alert('License activated! All activities unlocked.');
     updateLicenseDisplay();
     renderCurrentTab();
@@ -564,7 +566,17 @@ function exportCSV() {
   let csv = `Date,Name,Type,Distance (${labels.distance}),Duration,Pace (${labels.pace}),Elevation (${labels.elevation}),Gear\n`;
   
   for (const activity of filteredActivities) {
-    csv += `${formatDate(activity.startTime)},"${activity.name}",${activity.type},${formatDistance(activity.distance, currentUnits)},${formatDuration(activity.duration)},${formatPace(activity.averagePace, currentUnits)},${formatElevation(activity.elevationGain, currentUnits)},${activity.gear || ''}\n`;
+    const fields = [
+      formatDate(activity.startTime),
+      activity.name,
+      activity.type,
+      formatDistance(activity.distance, currentUnits),
+      formatDuration(activity.duration),
+      formatPace(activity.averagePace, currentUnits),
+      formatElevation(activity.elevationGain, currentUnits),
+      activity.gear || ''
+    ];
+    csv += fields.map(escapeCsvField).join(',') + '\n';
   }
   
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -572,7 +584,46 @@ function exportCSV() {
 }
 
 function exportGPX() {
-  alert('GPX export: Feature stubbed for v1');
+  const activitiesWithRoutes = filteredActivities.filter(a => a.route && a.route.length > 0);
+  
+  if (activitiesWithRoutes.length === 0) {
+    alert('No activities with GPS data in current filter');
+    return;
+  }
+  
+  let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  gpx += '<gpx version="1.1" creator="Trail Archive" xmlns="http://www.topografix.com/GPX/1/1">\n';
+  
+  for (const activity of activitiesWithRoutes) {
+    gpx += '  <trk>\n';
+    gpx += `    <name>${escapeXml(activity.name)}</name>\n`;
+    gpx += `    <type>${activity.type}</type>\n`;
+    gpx += '    <trkseg>\n';
+    
+    for (const point of activity.route!) {
+      gpx += `      <trkpt lat="${point.lat}" lon="${point.lon}">\n`;
+      if (point.ele) gpx += `        <ele>${point.ele}</ele>\n`;
+      if (point.time) gpx += `        <time>${point.time.toISOString()}</time>\n`;
+      gpx += '      </trkpt>\n';
+    }
+    
+    gpx += '    </trkseg>\n';
+    gpx += '  </trk>\n';
+  }
+  
+  gpx += '</gpx>';
+  
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  downloadBlob(blob, 'trail-archive-export.gpx');
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 function exportAISummary() {
@@ -582,8 +633,8 @@ function exportAISummary() {
     totalDistance: filteredActivities.reduce((sum, a) => sum + a.distance, 0),
     totalDuration: filteredActivities.reduce((sum, a) => sum + a.duration, 0),
     totalElevation: filteredActivities.reduce((sum, a) => sum + a.elevationGain, 0),
-    records: computeRecords(allActivities),
-    yearlyStats: Object.fromEntries(computeYearlyStats(allActivities))
+    records: computeRecords(allActivities, licenseValid),
+    yearlyStats: Object.fromEntries(computeYearlyStats(allActivities, licenseValid))
   };
   
   const markdown = `# Training Summary

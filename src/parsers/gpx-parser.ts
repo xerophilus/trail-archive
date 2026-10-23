@@ -1,73 +1,90 @@
+import { XMLParser } from 'fast-xml-parser';
 import type { Activity, RoutePoint, Split } from '../types';
 
 export function parseGPX(xmlText: string, activityId?: string): Activity | null {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlText, 'text/xml');
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    parseAttributeValue: true
+  });
   
-  if (doc.querySelector('parsererror')) return null;
-  
-  const trk = doc.querySelector('trk');
-  if (!trk) return null;
-  
-  const name = trk.querySelector('name')?.textContent?.trim() || 'Untitled Activity';
-  const type = trk.querySelector('type')?.textContent?.trim() || 'Run';
-  
-  const trkpts = Array.from(doc.querySelectorAll('trkpt'));
-  if (trkpts.length === 0) return null;
-  
-  const route: RoutePoint[] = [];
-  let firstTime: Date | null = null;
-  let lastTime: Date | null = null;
-  let totalDistance = 0;
-  let totalElevationGain = 0;
-  let lastPoint: RoutePoint | null = null;
-  
-  for (const trkpt of trkpts) {
-    const lat = parseFloat(trkpt.getAttribute('lat') || '0');
-    const lon = parseFloat(trkpt.getAttribute('lon') || '0');
-    const ele = parseFloat(trkpt.querySelector('ele')?.textContent || '0');
-    const timeStr = trkpt.querySelector('time')?.textContent;
-    const time = timeStr ? new Date(timeStr) : undefined;
+  try {
+    const doc = parser.parse(xmlText);
     
-    if (!firstTime && time) firstTime = time;
-    if (time) lastTime = time;
+    if (!doc.gpx) return null;
     
-    const point: RoutePoint = { lat, lon, ele, time };
-    route.push(point);
+    const trk = doc.gpx.trk;
+    if (!trk) return null;
     
-    if (lastPoint) {
-      const dist = haversineDistance(lastPoint.lat, lastPoint.lon, lat, lon);
-      totalDistance += dist;
-      
-      if (lastPoint.ele && ele && ele > lastPoint.ele) {
-        totalElevationGain += (ele - lastPoint.ele);
+    const name = trk.name || 'Untitled Activity';
+    const type = trk.type || 'Run';
+    
+    let trkpts: any[] = [];
+    if (trk.trkseg) {
+      const segments = Array.isArray(trk.trkseg) ? trk.trkseg : [trk.trkseg];
+      for (const seg of segments) {
+        if (seg.trkpt) {
+          const pts = Array.isArray(seg.trkpt) ? seg.trkpt : [seg.trkpt];
+          trkpts.push(...pts);
+        }
       }
     }
     
-    lastPoint = point;
+    if (trkpts.length === 0) return null;
+    
+    const route: RoutePoint[] = [];
+    let firstTime: Date | null = null;
+    let lastTime: Date | null = null;
+    let totalDistance = 0;
+    let totalElevationGain = 0;
+    let lastPoint: RoutePoint | null = null;
+    
+    for (const trkpt of trkpts) {
+      const lat = trkpt['@_lat'] || 0;
+      const lon = trkpt['@_lon'] || 0;
+      const ele = trkpt.ele || 0;
+      const timeStr = trkpt.time;
+      const time = timeStr ? new Date(timeStr) : undefined;
+      
+      if (!firstTime && time) firstTime = time;
+      if (time) lastTime = time;
+      
+      const point: RoutePoint = { lat, lon, ele, time };
+      route.push(point);
+      
+      if (lastPoint) {
+        const dist = haversineDistance(lastPoint.lat, lastPoint.lon, lat, lon);
+        totalDistance += dist;
+        
+        if (lastPoint.ele && ele && ele > lastPoint.ele) {
+          totalElevationGain += (ele - lastPoint.ele);
+        }
+      }
+      
+      lastPoint = point;
+    }
+    
+    const duration = firstTime && lastTime ? (lastTime.getTime() - firstTime.getTime()) / 1000 : 0;
+    const startTime = firstTime || new Date();
+    
+    const id = activityId || `gpx-${startTime.getTime()}`;
+    
+    return {
+      id,
+      name,
+      type,
+      startTime,
+      distance: totalDistance,
+      duration,
+      elevationGain: totalElevationGain,
+      averagePace: duration > 0 && totalDistance > 0 ? duration / totalDistance : undefined,
+      route,
+      locked: false
+    };
+  } catch (error) {
+    console.error('GPX parse error:', error);
+    return null;
   }
-  
-  const duration = firstTime && lastTime ? (lastTime.getTime() - firstTime.getTime()) / 1000 : 0;
-  const startTime = firstTime || new Date();
-  
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const locked = startTime < twelveMonthsAgo;
-  
-  const id = activityId || `gpx-${startTime.getTime()}`;
-  
-  return {
-    id,
-    name,
-    type,
-    startTime,
-    distance: totalDistance,
-    duration,
-    elevationGain: totalElevationGain,
-    averagePace: duration > 0 && totalDistance > 0 ? duration / totalDistance : undefined,
-    route,
-    locked
-  };
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

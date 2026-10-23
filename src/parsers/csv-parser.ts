@@ -147,10 +147,6 @@ function parseActivityFromFields(fields: string[], indices: ColumnIndices): Acti
   const duration = movingSeconds;
   const averagePace = duration > 0 && distance > 0 ? duration / distance : undefined;
   
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const locked = startTime < twelveMonthsAgo;
-  
   return {
     id,
     name: fields[indices.activityName]?.trim() || 'Untitled Activity',
@@ -161,7 +157,7 @@ function parseActivityFromFields(fields: string[], indices: ColumnIndices): Acti
     elevationGain,
     averagePace,
     gear: fields[indices.activityGear]?.trim() || undefined,
-    locked
+    locked: false
   };
 }
 

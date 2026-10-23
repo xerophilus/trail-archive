@@ -9,47 +9,27 @@ describe('License Verification', () => {
   });
   
   it('rejects missing payload fields', async () => {
-    const payload = btoa(JSON.stringify({ invalid: true }));
-    const signature = btoa('0'.repeat(128));
+    const payload = base64urlEncode(JSON.stringify({ invalid: true }));
+    const signature = base64urlEncode('0'.repeat(64));
     const key = `${payload}.${signature}`;
     
     const status = await verifyLicense(key);
     expect(status.isValid).toBe(false);
   });
   
-  it('accepts valid lifetime license with placeholder key', async () => {
+  it('rejects license when placeholder key is configured', async () => {
     const payload = {
       type: 'lifetime',
       issued: new Date().toISOString()
     };
-    const payloadB64 = btoa(JSON.stringify(payload));
-    const signatureB64 = btoa('0'.repeat(128));
+    const payloadB64 = base64urlEncode(JSON.stringify(payload));
+    const signatureB64 = base64urlEncode('0'.repeat(64));
     const key = `${payloadB64}.${signatureB64}`;
     
     const status = await verifyLicense(key);
     
-    expect(status.isValid).toBe(true);
-    expect(status.isLifetime).toBe(true);
-  });
-  
-  it('recognizes timed license', async () => {
-    const validUntil = new Date();
-    validUntil.setFullYear(validUntil.getFullYear() + 1);
-    
-    const payload = {
-      type: 'timed',
-      issued: new Date().toISOString(),
-      validUntil: validUntil.toISOString()
-    };
-    const payloadB64 = btoa(JSON.stringify(payload));
-    const signatureB64 = btoa('0'.repeat(128));
-    const key = `${payloadB64}.${signatureB64}`;
-    
-    const status = await verifyLicense(key);
-    
-    expect(status.isValid).toBe(true);
-    expect(status.isLifetime).toBe(false);
-    expect(status.validUntil).toBeInstanceOf(Date);
+    expect(status.isValid).toBe(false);
+    expect(status.error).toContain('not configured');
   });
   
   it('rejects expired timed license', async () => {
@@ -61,8 +41,8 @@ describe('License Verification', () => {
       issued: new Date().toISOString(),
       validUntil: validUntil.toISOString()
     };
-    const payloadB64 = btoa(JSON.stringify(payload));
-    const signatureB64 = btoa('0'.repeat(128));
+    const payloadB64 = base64urlEncode(JSON.stringify(payload));
+    const signatureB64 = base64urlEncode('0'.repeat(64));
     const key = `${payloadB64}.${signatureB64}`;
     
     const status = await verifyLicense(key);
@@ -72,6 +52,10 @@ describe('License Verification', () => {
   });
 });
 
-function btoa(str: string): string {
-  return Buffer.from(str).toString('base64');
+function base64urlEncode(str: string): string {
+  const bytes = Buffer.from(str);
+  return bytes.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
 }

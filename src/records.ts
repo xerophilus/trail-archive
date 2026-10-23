@@ -15,12 +15,16 @@ const BEST_EFFORTS: BestEffort[] = [
   { distance: 50, name: '50K', unit: 'km' }
 ];
 
-export function computeRecords(activities: Activity[]): Record[] {
+export function computeRecords(activities: Activity[], licenseValid: boolean): Record[] {
   const records: Record[] = [];
   
-  const runningActivities = activities.filter(a => 
-    !a.locked && (a.type === 'Run' || a.type === 'Trail Run' || a.type === 'Race')
-  );
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  
+  const runningActivities = activities.filter(a => {
+    const isLocked = !licenseValid && a.startTime < twelveMonthsAgo;
+    return !isLocked && (a.type === 'Run' || a.type === 'Trail Run' || a.type === 'Race');
+  });
   
   for (const effort of BEST_EFFORTS) {
     const best = findBestEffort(runningActivities, effort.distance);
@@ -152,11 +156,15 @@ function toRad(degrees: number): number {
   return degrees * Math.PI / 180;
 }
 
-export function computeYearlyStats(activities: Activity[]): Map<number, { distance: number; count: number }> {
+export function computeYearlyStats(activities: Activity[], licenseValid: boolean): Map<number, { distance: number; count: number }> {
   const yearlyStats = new Map<number, { distance: number; count: number }>();
   
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  
   for (const activity of activities) {
-    if (activity.locked) continue;
+    const isLocked = !licenseValid && activity.startTime < twelveMonthsAgo;
+    if (isLocked) continue;
     
     const year = activity.startTime.getFullYear();
     const stats = yearlyStats.get(year) || { distance: 0, count: 0 };

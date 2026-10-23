@@ -8,9 +8,11 @@ declare module 'fit-file-parser' {
     mode?: string;
   }
 
+  type FitParserCallback = (error: Error | undefined, data: any) => void;
+
   class FitParser {
     constructor(options?: FitParserOptions);
-    parse(buffer: ArrayBuffer | Buffer): void;
+    parse(buffer: ArrayBuffer | Buffer, callback: FitParserCallback): void;
     activity?: any;
     records?: any[];
     laps?: any[];
