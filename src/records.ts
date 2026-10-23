@@ -80,23 +80,19 @@ function findBestEffort(activities: Activity[], targetDistance: number): BestEff
   let best: BestEffortResult | null = null;
   
   for (const activity of activities) {
-    if (activity.distance >= targetDistance && activity.duration > 0) {
-      const estimatedDuration = (activity.duration / activity.distance) * targetDistance;
-      
-      if (!best || estimatedDuration < best.duration) {
+    if (activity.route && activity.route.length > 10) {
+      const gpsBestEffort = findBestEffortInRoute(activity.route, targetDistance);
+      if (gpsBestEffort && (!best || gpsBestEffort < best.duration)) {
         best = {
-          duration: estimatedDuration,
+          duration: gpsBestEffort,
           activityId: activity.id,
           date: activity.startTime
         };
       }
-    }
-    
-    if (activity.route && activity.route.length > 10) {
-      const windowEffort = findBestEffortInRoute(activity.route, targetDistance);
-      if (windowEffort && (!best || windowEffort < best.duration)) {
+    } else if (activity.duration > 0 && Math.abs(activity.distance - targetDistance) / targetDistance <= 0.03) {
+      if (!best || activity.duration < best.duration) {
         best = {
-          duration: windowEffort,
+          duration: activity.duration,
           activityId: activity.id,
           date: activity.startTime
         };
@@ -110,31 +106,78 @@ function findBestEffort(activities: Activity[], targetDistance: number): BestEff
 function findBestEffortInRoute(route: RoutePoint[], targetDistance: number): number | null {
   if (route.length < 2) return null;
   
-  let bestDuration: number | null = null;
+  interface CumulativePoint {
+    distance: number;
+    time: number;
+    index: number;
+  }
+  
+  const cumulative: CumulativePoint[] = [];
+  let totalDistance = 0;
   
   for (let i = 0; i < route.length; i++) {
-    let distance = 0;
-    let startTime = route[i].time;
-    if (!startTime) continue;
+    const point = route[i];
+    if (!point.time) continue;
     
-    for (let j = i + 1; j < route.length; j++) {
-      const prev = route[j - 1];
-      const curr = route[j];
-      
-      distance += haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
-      
-      if (distance >= targetDistance * 0.95 && distance <= targetDistance * 1.05) {
-        const endTime = curr.time;
-        if (endTime) {
-          const duration = (endTime.getTime() - startTime.getTime()) / 1000;
-          if (duration > 0 && (!bestDuration || duration < bestDuration)) {
-            bestDuration = duration;
-          }
+    if (i > 0) {
+      const prev = route[i - 1];
+      totalDistance += haversineDistance(prev.lat, prev.lon, point.lat, point.lon);
+    }
+    
+    cumulative.push({
+      distance: totalDistance,
+      time: point.time.getTime() / 1000,
+      index: i
+    });
+  }
+  
+  if (cumulative.length < 2) return null;
+  
+  let bestDuration: number | null = null;
+  let left = 0;
+  
+  for (let right = 1; right < cumulative.length; right++) {
+    const segmentDistance = cumulative[right].distance - cumulative[left].distance;
+    
+    while (segmentDistance > targetDistance && left < right - 1) {
+      left++;
+    }
+    
+    if (left >= right - 1) continue;
+    
+    const currentDistance = cumulative[right].distance - cumulative[left].distance;
+    
+    if (Math.abs(currentDistance - targetDistance) / targetDistance > 0.05) {
+      continue;
+    }
+    
+    let startTime = cumulative[left].time;
+    let endTime = cumulative[right].time;
+    
+    if (currentDistance < targetDistance) {
+      const deficit = targetDistance - currentDistance;
+      if (right < cumulative.length - 1) {
+        const nextSegmentDistance = cumulative[right + 1].distance - cumulative[right].distance;
+        if (nextSegmentDistance > 0) {
+          const ratio = deficit / nextSegmentDistance;
+          const nextSegmentTime = cumulative[right + 1].time - cumulative[right].time;
+          endTime += ratio * nextSegmentTime;
         }
-        break;
       }
-      
-      if (distance > targetDistance * 1.1) break;
+    } else if (currentDistance > targetDistance) {
+      const excess = currentDistance - targetDistance;
+      const lastSegmentDistance = cumulative[right].distance - cumulative[right - 1].distance;
+      if (lastSegmentDistance > 0) {
+        const ratio = excess / lastSegmentDistance;
+        const lastSegmentTime = cumulative[right].time - cumulative[right - 1].time;
+        endTime -= ratio * lastSegmentTime;
+      }
+    }
+    
+    const duration = endTime - startTime;
+    
+    if (duration > 0 && (!bestDuration || duration < bestDuration)) {
+      bestDuration = duration;
     }
   }
   

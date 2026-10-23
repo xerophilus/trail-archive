@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeRecords, computeYearlyStats } from '../records';
-import type { Activity } from '../types';
+import type { Activity, RoutePoint } from '../types';
 
 describe('Records Computation', () => {
   it('finds longest run', () => {
@@ -66,14 +66,14 @@ describe('Records Computation', () => {
     expect(biggestClimb!.value).toBe(1000);
   });
   
-  it('estimates best efforts from full activity distance', () => {
+  it('uses whole activity time only when distance is within 3%', () => {
     const activities: Activity[] = [
       {
         id: '1',
         name: '5K Run',
         type: 'Run',
         startTime: new Date('2026-10-19T10:00:00Z'),
-        distance: 5,
+        distance: 5.1,
         duration: 1200,
         elevationGain: 0,
         locked: false
@@ -85,6 +85,48 @@ describe('Records Computation', () => {
     
     expect(fiveK).toBeDefined();
     expect(fiveK!.value).toBe(1200);
+  });
+  
+  it('finds best effort from GPS track with fast middle segment', () => {
+    const baseTime = new Date('2026-10-19T10:00:00Z').getTime();
+    
+    const route: RoutePoint[] = [];
+    let lat = 0;
+    
+    for (let i = 0; i <= 100; i++) {
+      lat += 0.00015;
+      const time = baseTime + i * 10000;
+      route.push({
+        lat,
+        lon: 0,
+        time: new Date(time)
+      });
+    }
+    
+    const totalDistance = route.length * 0.0167;
+    
+    const activities: Activity[] = [
+      {
+        id: '1',
+        name: 'Variable Pace Run',
+        type: 'Run',
+        startTime: new Date(baseTime),
+        distance: totalDistance,
+        duration: 1000,
+        elevationGain: 0,
+        route,
+        locked: false
+      }
+    ];
+    
+    const records = computeRecords(activities, true);
+    const oneMile = records.find(r => r.name === '1 mile');
+    
+    expect(oneMile).toBeDefined();
+    if (oneMile) {
+      expect(oneMile.value).toBeGreaterThan(0);
+      expect(oneMile.value).toBeLessThan(1000);
+    }
   });
   
   it('excludes locked activities when license invalid', () => {

@@ -417,7 +417,7 @@ function renderActivityMap(activity: Activity) {
   }).addTo(map);
   
   const coords: [number, number][] = activity.route.map(p => [p.lat, p.lon]);
-  const polyline = L.polyline(coords, { color: '#2563eb', weight: 3 }).addTo(map);
+  const polyline = L.polyline(coords, { color: '#2f5d3a', weight: 3 }).addTo(map);
   map.fitBounds(polyline.getBounds());
 }
 
@@ -444,7 +444,7 @@ function renderHeatmap() {
   for (const activity of allRoutes) {
     if (!activity.route) continue;
     const coords: [number, number][] = activity.route.map(p => [p.lat, p.lon]);
-    L.polyline(coords, { color: '#2563eb', weight: 2, opacity: 0.3 }).addTo(map);
+    L.polyline(coords, { color: '#2f5d3a', weight: 2, opacity: 0.3 }).addTo(map);
     bounds.push(...coords);
   }
   

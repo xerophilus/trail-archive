@@ -10,7 +10,7 @@ export default defineConfig({
         name: 'Trail Archive',
         short_name: 'Trail Archive',
         description: 'Your whole running history, on your device, searchable.',
-        theme_color: '#2563eb',
+        theme_color: '#2f5d3a',
         background_color: '#ffffff',
         display: 'standalone',
         icons: [
@@ -23,6 +23,12 @@ export default defineConfig({
             src: '/icon-512.png',
             sizes: '512x512',
             type: 'image/png'
+          },
+          {
+            src: '/icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       },
