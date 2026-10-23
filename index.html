@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trail Archive</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <meta name="description" content="Your whole running history, on your device, searchable. One payment, no subscription.">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="container">
+        <h1 class="logo">Trail Archive</h1>
+        <div class="header-actions">
+          <button id="theme-toggle" class="btn-icon" aria-label="Toggle theme">
+            <span class="theme-icon">◐</span>
+          </button>
+          <button id="units-toggle" class="btn-secondary">mi</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <section id="landing" class="section landing">
+        <div class="container">
+          <h2>Your whole running history, on your device, searchable.</h2>
+          <p class="landing-subtitle">One payment, no subscription.</p>
+          
+          <div class="landing-content">
+            <p>Trail Archive imports your Strava bulk export and individual Garmin/watch files into a searchable archive stored entirely on your device. No account, no server, no uploads. Everything stays local.</p>
+            
+            <div class="instructions">
+              <h3>Getting your Strava export:</h3>
+              <ol>
+                <li>Go to <a href="https://www.strava.com/athlete/delete_your_account" target="_blank" rel="noopener">Strava Account Download</a></li>
+                <li>Click "Request Archive" (don't worry, you're not deleting your account)</li>
+                <li>Wait for the email with your download link (usually within an hour)</li>
+                <li>Download the ZIP file and drag it here</li>
+              </ol>
+            </div>
+
+            <p class="privacy-note">All processing happens in your browser. No data leaves your device. Map tiles are the only network requests.</p>
+          </div>
+
+          <div id="import-zone" class="import-zone">
+            <div class="import-zone-content">
+              <p class="import-zone-title">Drop Strava export ZIP or individual .fit/.gpx/.tcx files</p>
+              <p class="import-zone-subtitle">or click to browse</p>
+              <input type="file" id="file-input" multiple accept=".zip,.fit,.gpx,.tcx,.gz" hidden>
+            </div>
+            <div id="import-progress" class="import-progress" hidden>
+              <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+              </div>
+              <p id="progress-text" class="progress-text"></p>
+            </div>
+          </div>
+
+          <div id="license-status" class="license-status"></div>
+        </div>
+      </section>
+
+      <section id="archive" class="section" hidden>
+        <div class="container">
+          <nav class="tabs">
+            <button class="tab active" data-tab="activities">Activities</button>
+            <button class="tab" data-tab="heatmap">Heatmap</button>
+            <button class="tab" data-tab="records">Records</button>
+            <button class="tab" data-tab="gear">Gear</button>
+            <button class="tab" data-tab="charts">Charts</button>
+            <button class="tab" data-tab="export">Export</button>
+          </nav>
+
+          <div id="tab-activities" class="tab-content">
+            <div class="filters">
+              <input type="text" id="filter-name" placeholder="Search name..." class="input">
+              <input type="date" id="filter-date-start" class="input">
+              <input type="date" id="filter-date-end" class="input">
+              <select id="filter-type" class="input">
+                <option value="">All types</option>
+                <option value="Run">Run</option>
+                <option value="Trail Run">Trail Run</option>
+                <option value="Race">Race</option>
+              </select>
+              <button id="save-filter" class="btn-secondary">Save filter</button>
+              <button id="clear-filter" class="btn-secondary">Clear</button>
+            </div>
+            <div id="activities-table"></div>
+            <div id="activity-detail" class="activity-detail" hidden></div>
+          </div>
+
+          <div id="tab-heatmap" class="tab-content" hidden>
+            <div id="heatmap" class="map"></div>
+          </div>
+
+          <div id="tab-records" class="tab-content" hidden>
+            <div id="records-content"></div>
+          </div>
+
+          <div id="tab-gear" class="tab-content" hidden>
+            <div class="gear-controls">
+              <label>
+                Retire threshold: 
+                <input type="number" id="gear-threshold" value="400" class="input input-inline"> <span class="unit">mi</span>
+              </label>
+            </div>
+            <div id="gear-table"></div>
+          </div>
+
+          <div id="tab-charts" class="tab-content" hidden>
+            <div id="charts-content"></div>
+          </div>
+
+          <div id="tab-export" class="tab-content" hidden>
+            <div class="export-options">
+              <button id="export-csv" class="btn-secondary">Export filtered CSV</button>
+              <button id="export-gpx" class="btn-secondary">Export GPX bundle</button>
+              <button id="export-ai" class="btn-secondary">Export AI summary</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <p>Trail Archive v1.0 • All data stays on your device</p>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

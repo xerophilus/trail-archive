@@ -1,0 +1,31 @@
+{
+  "name": "trail-archive",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "fit-file-parser": "^1.10.0",
+    "idb": "^8.0.0",
+    "leaflet": "^1.9.4"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.8",
+    "@types/node": "^20.10.6",
+    "fake-indexeddb": "^6.2.6",
+    "happy-dom": "^21.0.4",
+    "jsdom": "^30.1.3",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vite-plugin-pwa": "^0.17.4",
+    "vitest": "^1.1.0",
+    "workbox-window": "^7.0.0"
+  }
+}
